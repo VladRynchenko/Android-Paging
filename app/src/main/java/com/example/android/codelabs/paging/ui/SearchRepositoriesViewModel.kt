@@ -16,21 +16,12 @@
 
 package com.example.android.codelabs.paging.ui
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.asLiveData
-import androidx.lifecycle.liveData
-import androidx.lifecycle.switchMap
-import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
-import androidx.paging.cachedIn
+import androidx.paging.*
 import com.example.android.codelabs.paging.data.GithubRepository
 import com.example.android.codelabs.paging.model.Repo
-import com.example.android.codelabs.paging.model.RepoSearchResult
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.map
 
 /**
  * ViewModel for the [SearchRepositoriesActivity] screen.
@@ -39,16 +30,46 @@ import kotlinx.coroutines.launch
 class SearchRepositoriesViewModel(private val repository: GithubRepository) : ViewModel() {
 
     private var currentQueryValue: String? = null
-    private var currentSearchResult: Flow<PagingData<Repo>>? = null
+    private var currentSearchResult: Flow<PagingData<UiModel>>? = null
 
-    fun searchRepo(queryString: String): Flow<PagingData<Repo>> {
+    fun searchRepo(queryString: String): Flow<PagingData<UiModel>> {
         val lastResult = currentSearchResult
         if (queryString == currentQueryValue && lastResult != null)
             return lastResult
         currentQueryValue = queryString
-        val newResult: Flow<PagingData<Repo>> =
-            repository.getSearchResultStream(queryString).cachedIn(viewModelScope)
+        val newResult: Flow<PagingData<UiModel>> =
+            repository.getSearchResultStream(queryString)
+                .map { pagingData -> pagingData.map { UiModel.RepoItem(it) } }
+                .map {
+                    it.insertSeparators<UiModel.RepoItem, UiModel> { before, after ->
+                        if (after == null) {
+                            // we're at the end of the list
+                            return@insertSeparators null
+                        }
+                        if (before == null) {
+                            // we're at the beginning of the list
+                            return@insertSeparators UiModel.SeparatorItem("${after.roundedStarCount}0.000+ stars")
+                        }
+                        if (before.roundedStarCount > after.roundedStarCount) {
+                            if (after.roundedStarCount >= 1) {
+                                UiModel.SeparatorItem("${after.roundedStarCount}0.000+ stars")
+                            } else {
+                                UiModel.SeparatorItem("< 10.000+ stars")
+                            }
+                        } else {
+                            // no separator
+                            null
+                        }
+                    }
+                }
+
+
+
+
         currentSearchResult = newResult
         return newResult
     }
+
 }
+
+

@@ -7,6 +7,7 @@ import androidx.paging.LoadState
 import androidx.recyclerview.widget.RecyclerView
 import com.example.android.codelabs.paging.R
 import com.example.android.codelabs.paging.databinding.ReposLoadStateFooterViewItemBinding
+import com.example.android.codelabs.paging.model.Repo
 
 class ReposLoadStateViewHolder(
     private val binding: ReposLoadStateFooterViewItemBinding,

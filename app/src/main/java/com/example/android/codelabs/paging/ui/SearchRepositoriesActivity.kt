@@ -10,6 +10,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
+import androidx.paging.ExperimentalPagingApi
 import androidx.paging.LoadState
 import androidx.recyclerview.widget.DividerItemDecoration
 import com.example.android.codelabs.paging.Injection
@@ -28,6 +29,7 @@ class SearchRepositoriesActivity : AppCompatActivity() {
 
     private var searchJob: Job? = null
 
+    @OptIn(ExperimentalPagingApi::class)
     private fun search(query: String) {
         // Make sure we cancel the previous job before creating a new one
         searchJob?.cancel()
@@ -46,7 +48,7 @@ class SearchRepositoriesActivity : AppCompatActivity() {
         setContentView(view)
 
         // get the view model
-        viewModel = ViewModelProvider(this, Injection.provideViewModelFactory())
+        viewModel = ViewModelProvider(this, Injection.provideViewModelFactory(this))
             .get(SearchRepositoriesViewModel::class.java)
 
         // add dividers between RecyclerView's row items
@@ -65,23 +67,30 @@ class SearchRepositoriesActivity : AppCompatActivity() {
         outState.putString(LAST_SEARCH_QUERY, binding.searchRepo.text.trim().toString())
     }
 
+
     private fun initAdapter() {
+        val header = ReposLoadStateAdapter { adapter.retry() }
+
         binding.list.adapter = adapter.withLoadStateHeaderAndFooter(
-            header = ReposLoadStateAdapter { adapter.retry() },
+            header = header,
             footer = ReposLoadStateAdapter { adapter.retry() }
         )
-        adapter.addLoadStateListener {loadState ->
+
+        adapter.addLoadStateListener { loadState ->
+
             val isListEmpty = loadState.refresh is LoadState.NotLoading && adapter.itemCount == 0
             showEmptyList(isListEmpty)
 
-            // Only show the list if refresh succeeds .
-            binding.list.isVisible = loadState.source.refresh is LoadState.NotLoading
-            // Show loading spinner during initial load or refresh.
-            binding.progressBar.isVisible = loadState.source.refresh is LoadState.Loading
-            // Show the retry state if initial load or refresh fails.
-            binding.retryButton.isVisible = loadState.source.refresh is LoadState.Error
+            header.loadState = loadState.mediator
+                ?.refresh
+                ?.takeIf { it is LoadState.Error && adapter.itemCount > 0 }
+                ?: loadState.prepend
 
-            // Toast on any error, regardless of whether it came from RemoteMediator or PagingSource
+            binding.list.isVisible =
+                loadState.source.refresh is LoadState.NotLoading || loadState.mediator?.refresh is LoadState.NotLoading
+            binding.progressBar.isVisible = loadState.mediator?.refresh is LoadState.Loading
+            binding.retryButton.isVisible =
+                loadState.mediator?.refresh is LoadState.Error && adapter.itemCount == 0
             val errorState = loadState.source.append as? LoadState.Error
                 ?: loadState.source.prepend as? LoadState.Error
                 ?: loadState.append as? LoadState.Error

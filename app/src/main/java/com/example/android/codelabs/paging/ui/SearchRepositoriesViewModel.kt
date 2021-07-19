@@ -32,6 +32,7 @@ class SearchRepositoriesViewModel(private val repository: GithubRepository) : Vi
     private var currentQueryValue: String? = null
     private var currentSearchResult: Flow<PagingData<UiModel>>? = null
 
+    @ExperimentalPagingApi
     fun searchRepo(queryString: String): Flow<PagingData<UiModel>> {
         val lastResult = currentSearchResult
         if (queryString == currentQueryValue && lastResult != null)
